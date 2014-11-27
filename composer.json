@@ -1,0 +1,21 @@
+{
+    "name": "kix/alfabank-payment",
+    "authors": [
+        {
+            "name": "Stepan Anchugov",
+            "email": "kixxx1@gmail.com"
+        }
+    ],
+    "config": {
+        "bin-dir": "bin/"
+    },
+    "autoload": {
+        "psr-0": { "": "src" }
+    },
+    "require": {
+        "guzzlehttp/guzzle": "dev-master"
+    },
+    "require-dev": {
+        "phpspec/phpspec": "@stable"
+    }
+}
