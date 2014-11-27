@@ -2,6 +2,8 @@
 
 namespace Alfabank;
 
+use Alfabank\Adapter\AdapterInterface;
+use Alfabank\Client\Card;
 use Alfabank\Client\Configuration;
 use Alfabank\Client\Exception\OrderNumberNonUnique;
 use Alfabank\Client\Exception\OrderNumberNotSpecified;
@@ -16,27 +18,18 @@ class Client
 
     const PREFIX = '/testpayment/rest/';
 
-    public function __construct(Configuration $configuration)
+    public function __construct(Configuration $configuration, AdapterInterface $adapter)
     {
         $this->configuration = $configuration;
-        $this->client = new \GuzzleHttp\Client([
-            'base_url' => $this->configuration->getBaseUrl(),
-            'defaults' => [
-                'query' => [
-                    'userName' => $this->configuration->getUsername(),
-                    'password' => $this->configuration->getPassword(),
-                ]
-            ],
-        ]);
+        $this->adapter = $adapter;
     }
 
     public function registerOrder(Order $order)
     {
-        $request = $this->client->createRequest('GET', self::PREFIX . 'register.do', [
+        $response = $this->adapter->request('GET', 'register.do', [
             'query' => $order->toArray(),
         ]);
 
-        $response = $this->client->send($request);
         $result = (array) json_decode($response->getBody());
 
         if (array_key_exists('errorCode', $result)) {
@@ -57,12 +50,51 @@ class Client
             throw new OrderNumberNotSpecified();
         }
 
-        $request = $this->client->createRequest('GET', self::PREFIX . 'getOrderStatusExtended.do', [
+        $response = $this->adapter->request('GET', 'getOrderStatusExtended.do', [
             'query' => ['orderNumber' => $number]
         ]);
 
-        $response = $this->client->send($request);
-
         return AbstractStatus::fromJson($response->getBody());
+    }
+
+    public function cancelOrder(Order $order)
+    {
+        if (!$number = $order->getNumber()) {
+            throw new OrderNumberNotSpecified();
+        }
+
+        $response = $this->adapter->request('GET', 'reverse.do', [
+            'query' => ['orderNumber' => $number],
+        ]);
+    }
+
+    public function refundOrder(Order $order)
+    {
+        if (!$number = $order->getNumber()) {
+            throw new OrderNumberNotSpecified();
+        }
+
+        $response = $this->adapter->request('GET', 'refund.do', [
+            'query' => ['orderNumber' => $number],
+        ]);
+
+        $result = (array) json_decode($response->getBody());
+
+        return $result['errorCode'] == false;
+    }
+
+    public function check3ds(Card $card)
+    {
+        $response = $this->adapter->request('GET', 'verifyEnrollment.do', [
+            'query' => ['pan' => $card->getNumber()],
+        ]);
+
+        $result = (array) json_decode($response->getBody());
+
+        if ($result['enrolled'] == 'Y') {
+            return true;
+        }
+
+        return false;
     }
 }
